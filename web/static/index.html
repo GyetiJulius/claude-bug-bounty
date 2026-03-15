@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AppSec Multi-Agent Framework</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#f0fdf4', 500:'#22c55e', 600:'#16a34a', 700:'#15803d' },
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+    /* Markdown rendering */
+    .md-body h1 { font-size:1.5rem; font-weight:700; margin:1.25rem 0 .5rem; }
+    .md-body h2 { font-size:1.25rem; font-weight:700; margin:1rem 0 .5rem; border-bottom:1px solid #374151; padding-bottom:.25rem; }
+    .md-body h3 { font-size:1rem; font-weight:600; margin:.75rem 0 .25rem; }
+    .md-body p  { margin:.5rem 0; line-height:1.6; }
+    .md-body ul, .md-body ol { margin:.5rem 0 .5rem 1.5rem; }
+    .md-body li { margin:.2rem 0; }
+    .md-body pre { background:#111827; border:1px solid #374151; border-radius:.375rem; padding:.75rem; overflow-x:auto; margin:.75rem 0; }
+    .md-body code { font-family:monospace; font-size:.875em; background:#111827; padding:.1em .3em; border-radius:.2em; }
+    .md-body pre code { background:transparent; padding:0; }
+    .md-body table { border-collapse:collapse; width:100%; margin:.75rem 0; }
+    .md-body th, .md-body td { border:1px solid #374151; padding:.4rem .75rem; text-align:left; }
+    .md-body th { background:#1f2937; font-weight:600; }
+    .md-body blockquote { border-left:3px solid #4b5563; padding:.25rem .75rem; margin:.5rem 0; color:#9ca3af; }
+    .md-body hr { border:0; border-top:1px solid #374151; margin:1rem 0; }
+    .md-body a { color:#22c55e; text-decoration:underline; }
+
+    /* Toast */
+    #toast { transition: all .3s; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; }
+
+    /* Phase pill */
+    .phase-done    { background:#14532d; color:#86efac; }
+    .phase-running { background:#1e3a5f; color:#93c5fd; }
+    .phase-failed  { background:#450a0a; color:#fca5a5; }
+    .phase-skipped { background:#1c1917; color:#78716c; }
+    .phase-pending { background:#1c1917; color:#6b7280; }
+
+    /* Ensure .hidden works even if Tailwind CDN is blocked by a browser/network filter */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
+
+<!-- ─── TOAST ──────────────────────────────────────────────────────────── -->
+<div id="toast" class="fixed top-4 right-4 z-50 hidden max-w-sm px-4 py-3 rounded-lg shadow-lg text-sm font-medium"></div>
+
+<!-- ─── HEADER ─────────────────────────────────────────────────────────── -->
+<header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+  <div class="flex items-center gap-3">
+    <svg class="w-7 h-7 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+    </svg>
+    <span class="font-bold text-lg tracking-tight">AppSec Framework</span>
+    <span class="text-xs text-gray-500 hidden sm:inline">Authorized Use Only</span>
+  </div>
+  <nav class="flex gap-1">
+    <button onclick="navigate('dashboard')" id="nav-dashboard"
+      class="nav-btn px-3 py-1.5 rounded text-sm font-medium transition">Dashboard</button>
+    <button onclick="navigate('new-scan')" id="nav-new-scan"
+      class="nav-btn px-3 py-1.5 rounded text-sm font-medium transition">+ New Scan</button>
+  </nav>
+</header>
+
+<!-- ─── MAIN ───────────────────────────────────────────────────────────── -->
+<main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+  <!-- Dashboard -->
+  <section id="page-dashboard" class="page hidden">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold">Scan Dashboard</h1>
+      <button onclick="loadDashboard()" class="text-sm text-gray-400 hover:text-green-400 flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+
+    <!-- Stats row -->
+    <div id="stats-row" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"></div>
+
+    <!-- Scan table -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+        <span class="font-semibold text-sm">Scan History</span>
+        <span id="scan-count" class="text-xs text-gray-500"></span>
+      </div>
+      <div id="scan-list" class="divide-y divide-gray-800"></div>
+      <div id="scan-empty" class="hidden py-16 text-center text-gray-500">
+        <svg class="w-10 h-10 mx-auto mb-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <p>No scans yet. <button onclick="navigate('new-scan')" class="text-green-400 hover:underline">Start your first scan →</button></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- New Scan Form -->
+  <section id="page-new-scan" class="page hidden max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">New Scan</h1>
+    <div class="bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-3 mb-6 text-sm text-amber-300">
+      ⚠️ <strong>Authorized use only.</strong> Only scan systems you have explicit written permission to test.
+    </div>
+
+    <form id="scan-form" onsubmit="submitScan(event)" class="space-y-6">
+
+      <!-- Targets -->
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h2 class="font-semibold mb-4 text-base">Targets</h2>
+        <label class="block text-sm text-gray-400 mb-1">Domain(s) — one per line</label>
+        <textarea id="f-targets" rows="4" placeholder="example.com&#10;api.example.com"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none font-mono"
+          required></textarea>
+
+        <label class="block text-sm text-gray-400 mt-4 mb-1">Authorization ID</label>
+        <input id="f-auth-id" type="text" placeholder="AUTH-HACKERONE-2024-001 (required for active scans)"
+          class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+        <p class="text-xs text-gray-500 mt-1">Leave blank to use AUTHORIZATION_ID env variable, or enable dry-run mode.</p>
+      </div>
+
+      <!-- Profile -->
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h2 class="font-semibold mb-4 text-base">Scan Profile</h2>
+        <div class="grid grid-cols-3 gap-3">
+          <label id="profile-quick" onclick="selectProfile('quick')"
+            class="profile-card cursor-pointer rounded-lg border-2 border-green-500 p-3 transition">
+            <div class="font-semibold text-sm">⚡ Quick</div>
+            <div class="text-xs text-gray-400 mt-1">Critical + High<br>10 threads · 50 req/s</div>
+          </label>
+          <label id="profile-deep" onclick="selectProfile('deep')"
+            class="profile-card cursor-pointer rounded-lg border-2 border-gray-700 p-3 transition">
+            <div class="font-semibold text-sm">🔍 Deep</div>
+            <div class="text-xs text-gray-400 mt-1">+Medium<br>15 threads · 30 req/s</div>
+          </label>
+          <label id="profile-nightly" onclick="selectProfile('nightly')"
+            class="profile-card cursor-pointer rounded-lg border-2 border-gray-700 p-3 transition">
+            <div class="font-semibold text-sm">🌙 Nightly</div>
+            <div class="text-xs text-gray-400 mt-1">All severities<br>20 threads · 20 req/s</div>
+          </label>
+        </div>
+        <input type="hidden" id="f-profile" value="quick" />
+      </div>
+
+      <!-- Options -->
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-5">
+        <h2 class="font-semibold mb-4 text-base">Options</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <input id="f-dry-run" type="checkbox" class="w-4 h-4 rounded accent-green-500" />
+            <div>
+              <div class="text-sm font-medium">Dry Run</div>
+              <div class="text-xs text-gray-500">Validate config without network requests</div>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <input id="f-crawl-only" type="checkbox" class="w-4 h-4 rounded accent-green-500" />
+            <div>
+              <div class="text-sm font-medium">Crawl Only</div>
+              <div class="text-xs text-gray-500">Recon phases only, skip vulnerability scan</div>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <input id="f-skip-subfinder" type="checkbox" class="w-4 h-4 rounded accent-green-500" />
+            <div>
+              <div class="text-sm font-medium">Skip Subfinder</div>
+              <div class="text-xs text-gray-500">Skip subdomain enumeration</div>
+            </div>
+          </label>
+
+          <label class="flex items-center gap-3 cursor-pointer select-none">
+            <input id="f-resume" type="checkbox" class="w-4 h-4 rounded accent-green-500" />
+            <div>
+              <div class="text-sm font-medium">Resume</div>
+              <div class="text-xs text-gray-500">Skip already-completed phases</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Advanced toggle -->
+        <button type="button" onclick="toggleAdvanced()"
+          class="mt-4 text-sm text-gray-400 hover:text-green-400 flex items-center gap-1">
+          <svg id="adv-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          Advanced options
+        </button>
+
+        <div id="advanced-opts" class="hidden mt-4 space-y-3 border-t border-gray-800 pt-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">Threads</label>
+              <input id="f-threads" type="number" min="1" max="50" placeholder="Profile default"
+                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">Rate Limit (req/s)</label>
+              <input id="f-rate-limit" type="number" min="1" max="500" placeholder="Profile default"
+                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">LLM Provider</label>
+              <select id="f-provider"
+                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500">
+                <option value="">Auto (from env)</option>
+                <option value="groq">Groq</option>
+                <option value="cerebras">Cerebras</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 block mb-1">Severity Filter</label>
+              <input id="f-severity" type="text" placeholder="critical,high,medium"
+                class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500" />
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-gray-400 block mb-1">Scope Allowlist (comma-separated suffixes)</label>
+            <input id="f-scope-allowlist" type="text" placeholder=".example.com,.sub.example.com"
+              class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-green-500" />
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn"
+        class="w-full bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Start Scan
+      </button>
+    </form>
+  </section>
+
+  <!-- Scan Detail -->
+  <section id="page-scan-detail" class="page hidden">
+    <!-- Back button + title -->
+    <div class="flex items-center gap-3 mb-6">
+      <button onclick="navigate('dashboard')"
+        class="text-gray-400 hover:text-white flex items-center gap-1 text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back
+      </button>
+      <h1 id="detail-run-id" class="text-lg font-bold font-mono truncate"></h1>
+      <span id="detail-status-badge" class="ml-auto text-xs px-2.5 py-1 rounded-full font-medium"></span>
+    </div>
+
+    <!-- Meta row -->
+    <div id="detail-meta" class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-sm"></div>
+
+    <!-- Tabs -->
+    <div class="flex gap-1 mb-6 border-b border-gray-800">
+      <button class="detail-tab active-tab px-4 py-2 text-sm font-medium" onclick="showTab('overview')">Overview</button>
+      <button class="detail-tab px-4 py-2 text-sm font-medium" onclick="showTab('findings')">Findings</button>
+      <button class="detail-tab px-4 py-2 text-sm font-medium" onclick="showTab('report')">Report</button>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div id="tab-overview" class="tab-panel">
+      <div id="targets-grid" class="space-y-4"></div>
+    </div>
+
+    <!-- Tab: Findings -->
+    <div id="tab-findings" class="tab-panel hidden">
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="filterFindings(null)" data-severity="" class="sev-filter active-filter px-3 py-1 rounded-full text-xs font-medium bg-gray-700 text-white">All</button>
+        <button onclick="filterFindings('critical')" data-severity="critical" class="sev-filter px-3 py-1 rounded-full text-xs font-medium bg-red-900/40 text-red-400">Critical</button>
+        <button onclick="filterFindings('high')" data-severity="high" class="sev-filter px-3 py-1 rounded-full text-xs font-medium bg-orange-900/40 text-orange-400">High</button>
+        <button onclick="filterFindings('medium')" data-severity="medium" class="sev-filter px-3 py-1 rounded-full text-xs font-medium bg-yellow-900/40 text-yellow-400">Medium</button>
+        <button onclick="filterFindings('low')" data-severity="low" class="sev-filter px-3 py-1 rounded-full text-xs font-medium bg-blue-900/40 text-blue-400">Low</button>
+        <button onclick="filterFindings('info')" data-severity="info" class="sev-filter px-3 py-1 rounded-full text-xs font-medium bg-gray-700 text-gray-400">Info</button>
+      </div>
+      <div id="findings-table" class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden"></div>
+      <div id="findings-empty" class="hidden py-16 text-center text-gray-500 bg-gray-900 rounded-xl border border-gray-800">
+        No findings for this filter.
+      </div>
+    </div>
+
+    <!-- Tab: Report -->
+    <div id="tab-report" class="tab-panel hidden">
+      <div id="report-target-selector" class="flex flex-wrap gap-2 mb-4"></div>
+      <div id="report-content" class="bg-gray-900 rounded-xl border border-gray-800 p-6 md-body text-sm text-gray-200"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════════════════════════
+const API = '';  // same-origin
+let currentRunId = null;
+let pollInterval = null;
+let allFindings = [];
+let _findingsStore = [];   // safe store — never embedded in HTML
+let currentTargets = [];
+let selectedProfile = 'quick';
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Navigation
+// ═══════════════════════════════════════════════════════════════════════════
+function navigate(page, runId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.remove('bg-gray-800','text-white');
+    b.classList.add('text-gray-400','hover:text-white');
+  });
+
+  stopPolling();
+
+  if (page === 'dashboard') {
+    document.getElementById('page-dashboard').classList.remove('hidden');
+    document.getElementById('nav-dashboard').classList.add('bg-gray-800','text-white');
+    loadDashboard();
+  } else if (page === 'new-scan') {
+    document.getElementById('page-new-scan').classList.remove('hidden');
+    document.getElementById('nav-new-scan').classList.add('bg-gray-800','text-white');
+  } else if (page === 'scan-detail' && runId) {
+    document.getElementById('page-scan-detail').classList.remove('hidden');
+    currentRunId = runId;
+    loadScanDetail(runId);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Dashboard
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const scans = await apiFetch('/api/scans');
+    renderDashboard(scans);
+  } catch(e) {
+    showToast('Failed to load scans: ' + e.message, 'error');
+  }
+}
+
+function renderDashboard(scans) {
+  const list = document.getElementById('scan-list');
+  const empty = document.getElementById('scan-empty');
+  const count = document.getElementById('scan-count');
+  const statsRow = document.getElementById('stats-row');
+
+  count.textContent = `${scans.length} run${scans.length !== 1 ? 's' : ''}`;
+
+  // Stats
+  const running = scans.filter(s => s.status === 'running').length;
+  const done    = scans.filter(s => s.status === 'done').length;
+  const failed  = scans.filter(s => s.status === 'failed').length;
+  const findings = scans.reduce((a, s) => a + (s.total_findings || 0), 0);
+
+  statsRow.innerHTML = [
+    statCard('Total Scans', scans.length, 'text-blue-400'),
+    statCard('Running', running, 'text-yellow-400'),
+    statCard('Done', done, 'text-green-400'),
+    statCard('Findings', findings, 'text-red-400'),
+  ].join('');
+
+  if (!scans.length) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = scans.map(s => {
+    const targets = (s.targets || []).slice(0, 3).join(', ') + (s.targets.length > 3 ? ` +${s.targets.length - 3}` : '');
+    const started = s.started_at ? new Date(s.started_at).toLocaleString() : '—';
+    return `
+    <div class="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-800/50 cursor-pointer transition"
+         onclick="navigate('scan-detail','${s.run_id}')">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="font-mono text-sm text-gray-200 truncate">${s.run_id}</span>
+          ${s.dry_run ? '<span class="text-xs bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">dry-run</span>' : ''}
+        </div>
+        <div class="text-xs text-gray-400 truncate mt-0.5">${targets || '—'}</div>
+      </div>
+      <div class="hidden sm:flex flex-col items-end text-xs text-gray-500">
+        <span>${s.profile || 'quick'}</span>
+        <span>${started}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        ${s.total_findings > 0 ? `<span class="text-xs text-red-400 font-medium">${s.total_findings} finding${s.total_findings !== 1 ? 's' : ''}</span>` : ''}
+        ${statusBadge(s.status)}
+      </div>
+      <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </div>`;
+  }).join('');
+}
+
+function statCard(label, value, colorClass) {
+  return `
+  <div class="bg-gray-900 rounded-xl border border-gray-800 px-5 py-4">
+    <div class="text-xs text-gray-500 uppercase tracking-wide">${label}</div>
+    <div class="text-2xl font-bold mt-1 ${colorClass}">${value}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Scan Detail
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadScanDetail(runId) {
+  showTab('overview');
+  try {
+    const data = await apiFetch(`/api/scans/${runId}`);
+    renderScanDetail(data);
+
+    if (data.status === 'running') {
+      pollInterval = setInterval(async () => {
+        try {
+          const updated = await apiFetch(`/api/scans/${runId}`);
+          renderScanDetail(updated);
+          if (updated.status !== 'running') stopPolling();
+        } catch(e) { stopPolling(); }
+      }, 3000);
+    }
+  } catch(e) {
+    showToast('Failed to load scan: ' + e.message, 'error');
+  }
+}
+
+function renderScanDetail(data) {
+  currentTargets = Object.keys(data.targets || {});
+
+  document.getElementById('detail-run-id').textContent = data.run_id;
+  document.getElementById('detail-status-badge').innerHTML = statusBadge(data.status);
+
+  // Meta row
+  const meta = document.getElementById('detail-meta');
+  meta.innerHTML = [
+    metaItem('Profile', data.profile || 'quick'),
+    metaItem('Started', data.started_at ? new Date(data.started_at).toLocaleString() : '—'),
+    metaItem('Finished', data.finished_at ? new Date(data.finished_at).toLocaleString() : data.status === 'running' ? '<span class="text-yellow-400">In progress…</span>' : '—'),
+    metaItem('Targets', currentTargets.length),
+  ].join('');
+
+  // Targets grid
+  const grid = document.getElementById('targets-grid');
+  if (!currentTargets.length) {
+    grid.innerHTML = '<p class="text-gray-500 text-sm">No targets.</p>';
+    return;
+  }
+
+  grid.innerHTML = currentTargets.map(t => {
+    const ts = data.targets[t];
+    const phases = ts.phases || {};
+    const findings = ts.findings_count || 0;
+    const sevBreak = ts.severity_breakdown || {};
+
+    const phaseOrder = ['subdomain_enum','live_host_check','url_collection','url_filter','param_extraction','alive_params','scan'];
+    const phaseHtml = phaseOrder.map(ph => {
+      const p = phases[ph];
+      if (!p) return '';
+      const cls = `phase-${p.status || 'pending'}`;
+      return `<span class="px-2 py-0.5 rounded text-xs font-medium ${cls}">${ph.replace(/_/g,' ')}</span>`;
+    }).filter(Boolean).join('');
+
+    const sevHtml = Object.entries(sevBreak).map(([sev, cnt]) =>
+      `<span class="text-xs px-1.5 py-0.5 rounded ${sevColor(sev)}">${sev}: ${cnt}</span>`
+    ).join('');
+
+    return `
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-4">
+      <div class="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <div class="font-semibold text-sm">${t}</div>
+          ${ts.error ? `<div class="text-xs text-red-400 mt-0.5">${ts.error}</div>` : ''}
+        </div>
+        <div class="flex items-center gap-2">
+          ${findings > 0 ? `<span class="text-xs text-red-400 font-medium">${findings} finding${findings !== 1 ? 's' : ''}</span>` : ''}
+          ${statusBadge(ts.status)}
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-1.5 mb-2">${phaseHtml || '<span class="text-xs text-gray-600">No phase data</span>'}</div>
+      ${sevHtml ? `<div class="flex flex-wrap gap-1.5 mt-2">${sevHtml}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Tabs
+// ═══════════════════════════════════════════════════════════════════════════
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.detail-tab').forEach(b => {
+    b.classList.remove('active-tab','border-b-2','border-green-500','text-green-400');
+    b.classList.add('text-gray-400');
+  });
+
+  document.getElementById(`tab-${tab}`).classList.remove('hidden');
+
+  const btn = document.querySelector(`.detail-tab[onclick="showTab('${tab}')"]`);
+  if (btn) {
+    btn.classList.add('active-tab','border-b-2','border-green-500','text-green-400');
+    btn.classList.remove('text-gray-400');
+  }
+
+  if (tab === 'findings') loadFindings();
+  if (tab === 'report') loadReport();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Findings
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadFindings() {
+  if (!currentRunId) return;
+  try {
+    const data = await apiFetch(`/api/scans/${currentRunId}/findings`);
+    allFindings = data.findings || [];
+    renderFindings(allFindings);
+  } catch(e) {
+    showToast('Failed to load findings: ' + e.message, 'error');
+  }
+}
+
+function filterFindings(severity) {
+  document.querySelectorAll('.sev-filter').forEach(b => {
+    b.classList.remove('active-filter','ring-2','ring-white/20');
+    if (b.dataset.severity === (severity || '')) {
+      b.classList.add('active-filter','ring-2','ring-white/20');
+    }
+  });
+  const filtered = severity ? allFindings.filter(f => (f.severity||'').toLowerCase() === severity) : allFindings;
+  renderFindings(filtered);
+}
+
+function renderFindings(findings) {
+  const table = document.getElementById('findings-table');
+  const empty = document.getElementById('findings-empty');
+
+  // Store in safe JS variable indexed by row position — never embed JSON in HTML
+  _findingsStore = findings.map(f => ({
+    name: f.name || '',
+    severity: f.severity || '',
+    url: f.url || f.matched_at || '',
+    target: f.target || '',
+    template_id: f.template_id || f['template-id'] || '',
+    description: f.description || '',
+    tags: Array.isArray(f.tags) ? f.tags.join(', ') : (f.tags || ''),
+  }));
+
+  if (!findings.length) {
+    table.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
+  }
+  table.classList.remove('hidden');
+  empty.classList.add('hidden');
+
+  table.innerHTML = `
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-xs text-gray-400 border-b border-gray-800 bg-gray-800/50">
+        <th class="px-4 py-2.5">Severity</th>
+        <th class="px-4 py-2.5">Name</th>
+        <th class="px-4 py-2.5">Target</th>
+        <th class="px-4 py-2.5">URL</th>
+        <th class="px-4 py-2.5">Template</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800" id="findings-tbody">
+    ${findings.map((f, i) => `
+      <tr class="hover:bg-gray-800/40 cursor-pointer" data-idx="${i}">
+        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-medium ${sevColor(f.severity)}">${esc(f.severity||'—')}</span></td>
+        <td class="px-4 py-2.5 font-medium text-gray-200">${esc(f.name||'Unknown')}</td>
+        <td class="px-4 py-2.5 text-gray-400">${esc(f.target||'')}</td>
+        <td class="px-4 py-2.5 text-gray-400 font-mono text-xs max-w-xs truncate">${esc(f.url||f.matched_at||'')}</td>
+        <td class="px-4 py-2.5 text-gray-500 font-mono text-xs">${esc(f.template_id||f['template-id']||'')}</td>
+      </tr>
+    `).join('')}
+    </tbody>
+  </table>
+  </div>
+  <div id="finding-expand" class="hidden border-t border-gray-800 px-5 py-4 bg-gray-800/30 text-sm space-y-2"></div>`;
+
+  // Attach click handlers via event delegation (safe — no user data in HTML)
+  document.getElementById('findings-tbody').addEventListener('click', e => {
+    const row = e.target.closest('tr[data-idx]');
+    if (row) expandFindingByIndex(parseInt(row.dataset.idx, 10));
+  });
+}
+
+function expandFindingByIndex(idx) {
+  const f = _findingsStore[idx];
+  if (!f) return;
+  const expand = document.getElementById('finding-expand');
+  if (!expand) return;
+  expand.classList.remove('hidden');
+  expand.innerHTML = `
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div><span class="text-gray-500 text-xs uppercase">Name</span><div class="font-medium mt-0.5">${esc(f.name)}</div></div>
+      <div><span class="text-gray-500 text-xs uppercase">Severity</span><div class="mt-0.5"><span class="px-2 py-0.5 rounded text-xs font-medium ${sevColor(f.severity)}">${esc(f.severity)}</span></div></div>
+      <div><span class="text-gray-500 text-xs uppercase">URL</span><div class="font-mono text-xs mt-0.5 break-all text-green-400">${esc(f.url)}</div></div>
+      <div><span class="text-gray-500 text-xs uppercase">Template</span><div class="font-mono text-xs mt-0.5">${esc(f.template_id)}</div></div>
+      ${f.tags ? `<div><span class="text-gray-500 text-xs uppercase">Tags</span><div class="text-xs mt-0.5 text-gray-400">${esc(f.tags)}</div></div>` : ''}
+      ${f.description ? `<div class="sm:col-span-2"><span class="text-gray-500 text-xs uppercase">Description</span><div class="text-xs mt-0.5 text-gray-300">${esc(f.description)}</div></div>` : ''}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Reports
+// ═══════════════════════════════════════════════════════════════════════════
+async function loadReport() {
+  if (!currentRunId || !currentTargets.length) return;
+  const sel = document.getElementById('report-target-selector');
+
+  // Render target selector using data attributes (safe — no inline user data in onclick)
+  sel.innerHTML = currentTargets.map((t, i) => `
+    <button data-target="${esc(t)}"
+      id="rpt-btn-${i}"
+      class="rpt-btn px-3 py-1 rounded text-xs font-medium border border-gray-700 hover:border-green-500 transition ${i===0?'bg-green-700 border-green-500 text-white':'text-gray-400'}">
+      ${esc(t)}
+    </button>`).join('');
+
+  // Attach click handler via delegation
+  sel.addEventListener('click', e => {
+    const btn = e.target.closest('.rpt-btn');
+    if (btn) loadTargetReport(currentRunId, btn.dataset.target);
+  }, { once: true });
+
+  if (currentTargets.length > 0) loadTargetReport(currentRunId, currentTargets[0]);
+}
+
+async function loadTargetReport(runId, target) {
+  // Highlight active button using data attribute (safe — no selector injection)
+  document.querySelectorAll('.rpt-btn').forEach(b => {
+    const isActive = b.dataset.target === target;
+    b.classList.toggle('bg-green-700', isActive);
+    b.classList.toggle('border-green-500', isActive);
+    b.classList.toggle('text-white', isActive);
+    b.classList.toggle('text-gray-400', !isActive);
+  });
+
+  const content = document.getElementById('report-content');
+  content.innerHTML = '<div class="text-gray-500 text-sm">Loading report…</div>';
+  try {
+    const data = await apiFetch(`/api/scans/${runId}/targets/${encodeURIComponent(target)}/report`);
+    content.innerHTML = marked.parse(data.content || '_No report content._');
+  } catch(e) {
+    content.innerHTML = `<div class="text-gray-500 text-sm">Report not yet available for ${target}. It will appear when the scan is complete.</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  New Scan
+// ═══════════════════════════════════════════════════════════════════════════
+function selectProfile(p) {
+  selectedProfile = p;
+  document.getElementById('f-profile').value = p;
+  ['quick','deep','nightly'].forEach(x => {
+    const el = document.getElementById(`profile-${x}`);
+    el.classList.toggle('border-green-500', x === p);
+    el.classList.toggle('bg-green-900/10', x === p);
+    el.classList.toggle('border-gray-700', x !== p);
+  });
+}
+
+function toggleAdvanced() {
+  const panel = document.getElementById('advanced-opts');
+  const chevron = document.getElementById('adv-chevron');
+  const hidden = panel.classList.toggle('hidden');
+  chevron.style.transform = hidden ? '' : 'rotate(90deg)';
+}
+
+async function submitScan(evt) {
+  evt.preventDefault();
+  const btn = document.getElementById('submit-btn');
+
+  const rawTargets = document.getElementById('f-targets').value.trim();
+  const targets = rawTargets.split('\n').map(t => t.trim()).filter(Boolean);
+  if (!targets.length) { showToast('Please enter at least one target.', 'error'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="w-5 h-5 spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Starting…`;
+
+  const payload = {
+    targets,
+    profile: document.getElementById('f-profile').value || 'quick',
+    authorization_id: document.getElementById('f-auth-id').value.trim(),
+    dry_run: document.getElementById('f-dry-run').checked,
+    crawl_only: document.getElementById('f-crawl-only').checked,
+    skip_subfinder: document.getElementById('f-skip-subfinder').checked,
+    resume: document.getElementById('f-resume').checked,
+    threads: parseInt(document.getElementById('f-threads').value) || null,
+    rate_limit: parseInt(document.getElementById('f-rate-limit').value) || null,
+    provider: document.getElementById('f-provider').value || null,
+    severity: document.getElementById('f-severity').value.trim() || null,
+    scope_allowlist: document.getElementById('f-scope-allowlist').value.trim() || null,
+  };
+
+  try {
+    const result = await apiFetch('/api/scans', { method:'POST', body: JSON.stringify(payload) });
+    showToast(`Scan started: ${result.run_id}`, 'success');
+    navigate('scan-detail', result.run_id);
+  } catch(e) {
+    showToast('Failed to start scan: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Start Scan`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Utilities
+// ═══════════════════════════════════════════════════════════════════════════
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(API + url, {
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+function statusBadge(status) {
+  const map = {
+    running: 'bg-yellow-900/40 text-yellow-400',
+    done:    'bg-green-900/40 text-green-400',
+    failed:  'bg-red-900/40 text-red-400',
+    skipped: 'bg-gray-700 text-gray-400',
+  };
+  const cls = map[status] || 'bg-gray-700 text-gray-400';
+  return `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${cls}">${status || '—'}</span>`;
+}
+
+function sevColor(sev) {
+  const map = {
+    critical: 'bg-red-900/50 text-red-400',
+    high:     'bg-orange-900/50 text-orange-400',
+    medium:   'bg-yellow-900/50 text-yellow-400',
+    low:      'bg-blue-900/50 text-blue-400',
+    info:     'bg-gray-700 text-gray-400',
+  };
+  return map[(sev||'').toLowerCase()] || 'bg-gray-700 text-gray-400';
+}
+
+function metaItem(label, value) {
+  return `<div class="bg-gray-900 rounded-lg border border-gray-800 px-4 py-3">
+    <div class="text-xs text-gray-500 uppercase tracking-wide">${label}</div>
+    <div class="font-medium mt-0.5">${value}</div>
+  </div>`;
+}
+
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  const map = { success: 'bg-green-800 text-green-100', error: 'bg-red-900 text-red-100', info: 'bg-gray-800 text-gray-100' };
+  t.className = `fixed top-4 right-4 z-50 max-w-sm px-4 py-3 rounded-lg shadow-lg text-sm font-medium ${map[type]}`;
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 4000);
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Init
+// ═══════════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  selectProfile('quick');
+  navigate('dashboard');
+});
+</script>
+</body>
+</html>

@@ -29,3 +29,13 @@ venv/
 # Tool output
 *.out
 nmap-output/
+
+# Scanner output directory (contains scan results and findings)
+output/
+
+# Test cache
+.pytest_cache/
+
+# Docker
+*.tar
+docker-compose.override.yml

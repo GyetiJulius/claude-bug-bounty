@@ -1,0 +1,54 @@
+# ============================================================================
+# AppSec Multi-Agent Framework — Docker Compose
+#
+# Usage:
+#   docker compose up --build          # build and start
+#   docker compose up -d               # start in background
+#   docker compose logs -f appsec      # follow logs
+#   docker compose down                # stop and remove containers
+#
+# The web UI will be available at http://localhost:8000
+# ============================================================================
+
+services:
+  appsec:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: appsec-framework:latest
+    container_name: appsec-framework
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+
+    # Mount a local output directory so scan results persist across restarts
+    volumes:
+      - ./output:/app/output
+
+    # Load environment variables from .env file (copy from .env.example)
+    env_file:
+      - .env
+
+    environment:
+      # Explicitly set output dir inside container
+      - OUTPUT_DIR=/app/output
+      # Can override LLM provider here; also settable via .env
+      # - LLM_PROVIDER=groq
+      # - LLM_MODEL=llama-3.1-70b-versatile
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Limit resource usage to avoid runaway scans
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
