@@ -409,6 +409,107 @@ This installs 18+ tools: `subfinder`, `httpx`, `dnsx`, `nuclei`, `katana`, `wayb
 
 ---
 
+## Web Interface
+
+A browser-based frontend lets you launch scans, monitor progress, and explore findings without touching the CLI.
+
+### Features
+
+| Feature | Description |
+|:--------|:------------|
+| **Dashboard** | Overview of all scan runs with status and finding counts |
+| **New Scan** | Form-based scan launcher with profile picker and advanced options |
+| **Live Progress** | Scan detail view auto-polls every 3 s while a run is active |
+| **Findings table** | Filterable by severity (Critical / High / Medium / Low / Info) |
+| **Report viewer** | Inline Markdown rendering of per-target reports |
+| **REST API** | Full API with interactive docs at `/api/docs` |
+
+### Run locally (Python)
+
+```bash
+# 1. Install Python dependencies
+pip install -r requirements.txt
+
+# 2. Copy and configure environment variables
+cp .env.example .env
+$EDITOR .env        # add your GROQ_API_KEY or CEREBRAS_API_KEY
+
+# 3. Start the web server
+uvicorn web.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+Open **http://localhost:8000** in your browser.
+
+### Run with Docker
+
+Docker bundles the web server **and all security tools** (`subfinder`, `httpx`, `nuclei`, `katana`, `gau`, `waybackurls`, `assetfinder`) into a single image.
+
+#### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) ≥ 20.10
+- [Docker Compose](https://docs.docker.com/compose/install/) v2 (included with Docker Desktop)
+
+#### Quick start
+
+```bash
+# 1. Clone and enter the repo
+git clone https://github.com/shuvonsec/claude-bug-bounty.git
+cd claude-bug-bounty
+
+# 2. Configure environment
+cp .env.example .env
+$EDITOR .env        # add your GROQ_API_KEY or CEREBRAS_API_KEY
+
+# 3. Build and start (first build ~5–10 min — downloads Go tools)
+docker compose up --build
+
+# Web UI is now at http://localhost:8000
+```
+
+Scan results are saved in the `./output/` directory on your host (mounted as a volume).
+
+#### Useful commands
+
+```bash
+# Start in background
+docker compose up -d --build
+
+# Follow logs
+docker compose logs -f appsec
+
+# Stop
+docker compose down
+
+# Rebuild after code changes
+docker compose up --build
+```
+
+#### Build the image manually
+
+```bash
+docker build -t appsec-framework .
+docker run -p 8000:8000 --env-file .env -v $(pwd)/output:/app/output appsec-framework
+```
+
+### API reference
+
+The server exposes a self-documented REST API:
+
+| Endpoint | Method | Description |
+|:---------|:-------|:------------|
+| `/api/health` | GET | Health check + installed tool versions |
+| `/api/scans` | POST | Launch a new scan |
+| `/api/scans` | GET | List all scan runs |
+| `/api/scans/{run_id}` | GET | Get run status and target details |
+| `/api/scans/{run_id}` | DELETE | Delete a run and its output |
+| `/api/scans/{run_id}/findings` | GET | All findings (filter by `severity=`) |
+| `/api/scans/{run_id}/targets/{target}/report` | GET | Per-target Markdown report |
+| `/api/scans/{run_id}/summary` | GET | Global summary JSON |
+
+Interactive docs: **http://localhost:8000/api/docs**
+
+---
+
 ## Contributing
 
 PRs welcome. Good contributions:

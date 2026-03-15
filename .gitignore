@@ -35,3 +35,7 @@ output/
 
 # Test cache
 .pytest_cache/
+
+# Docker
+*.tar
+docker-compose.override.yml

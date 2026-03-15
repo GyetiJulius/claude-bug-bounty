@@ -1,0 +1,19 @@
+# Docker build context exclusions
+.git
+.gitignore
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+output/
+*.log
+*.log.json
+.DS_Store
+*.md
+docs/
+wordlists/
+# Test files don't need to be in the image
+tests/
